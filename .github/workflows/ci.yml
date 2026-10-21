@@ -1,0 +1,69 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: deploypilot
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: deploypilot_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U deploypilot -d deploypilot_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      JWT_SECRET: ci-only-signing-key-with-at-least-32-characters
+      DEMO_PASSWORD: ci-only-demo-password
+      DATABASE_URL: postgresql+psycopg://deploypilot:ci-only-password@localhost:5432/deploypilot_test
+      TEST_DATABASE_URL: postgresql+psycopg://deploypilot:ci-only-password@localhost:5432/deploypilot_test
+      AGENT_MODE: offline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.lock
+      - run: ruff check backend apps/api tests
+      - run: alembic upgrade head
+      - run: alembic check
+      - run: python -m backend.db.seed
+      - run: python -m backend.evaluations.runner --output /tmp/deploypilot-evaluations
+      # Test fixtures own this disposable database and remove their schema after every case.
+      - run: pytest -q
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run build
+        working-directory: apps/web
+      - run: npm run typecheck
+        working-directory: apps/web
+  containers:
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-only-signing-key-with-at-least-32-characters
+      DEMO_PASSWORD: ci-only-demo-password
+      POSTGRES_PASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose config --quiet
+      - run: docker compose up --build -d --wait --wait-timeout 240
+      - run: curl --fail http://localhost:8000/health && curl --fail http://localhost:3000/
+      - if: always()
+        run: docker compose logs && docker compose down
