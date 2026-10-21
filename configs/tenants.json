@@ -1,0 +1,4 @@
+[
+  {"id":"northstar","name":"Northstar Commerce","industry":"E-commerce","workflow":"refund","integrations":["Mock orders","Mock customers","Simulated refunds"],"rules":{"refund_window_days":30,"approval_threshold_cents":10000,"original_payment_only":true}},
+  {"id":"orbit","name":"OrbitCloud SaaS","industry":"B2B software","workflow":"support","integrations":["Mock tickets","User directory","Knowledge base"],"rules":{"privileged_approval_role":"security","direct_credential_reset":false,"documentation_draft_only":true}}
+]
