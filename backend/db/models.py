@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
+
 from sqlalchemy import (
     JSON,
-    Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -11,7 +12,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    CheckConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase
 
@@ -25,7 +25,7 @@ def uid():
 
 
 def now():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Tenant(Base):

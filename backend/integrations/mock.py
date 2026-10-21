@@ -1,8 +1,10 @@
 """Local adapters. All actions are database-only, synthetic side effects."""
 
 from typing import Protocol
+
 from sqlalchemy import select
-from backend.db.models import Record, Action
+
+from backend.db.models import Action, Record
 
 
 class IntegrationError(Exception):

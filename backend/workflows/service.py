@@ -2,11 +2,13 @@ import hashlib
 import json
 import logging
 from time import perf_counter
+
 from fastapi import HTTPException
 from sqlalchemy import select
-from backend.db.models import Action, Approval, Audit, Policy, Request, Run, Tenant
-from backend.agents.service import AgentService, PROMPT_VERSION
-from backend.integrations.mock import MockIntegration, IntegrationError
+
+from backend.agents.service import PROMPT_VERSION, AgentService
+from backend.db.models import Approval, Audit, Policy, Request, Run, Tenant
+from backend.integrations.mock import IntegrationError, MockIntegration
 from backend.policies.engine import decide
 from backend.schemas import Recommendation, RequestInput
 
@@ -169,25 +171,27 @@ def decide_approval(db, principal, run_id, decision, note):
         raise HTTPException(403, "Approval role is not permitted")
     if run.state != "awaiting_approval" or approval.status != "pending":
         raise HTTPException(409, "Approval is no longer pending")
-    policy = current_policy(db, run.tenant_id)
-    if approval.policy_id != policy.id or approval.action_hash != fingerprint(
-        run.action, policy.id
-    ):
-        raise HTTPException(409, "Policy or proposed action changed; submit a new request")
-    request = db.get(Request, run.request_id)
-    tenant = db.get(Tenant, run.tenant_id)
-    record = MockIntegration(db).retrieve(run.tenant_id, request.payload["record_id"])
-    fresh = decide(
-        tenant.workflow,
-        policy.rules,
-        RequestInput.model_validate(request.payload),
-        record,
-        run.recommendation.get("uncertain", True),
-    )
-    if decision == "approve" and (
-        fresh["outcome"] == "deny" or fresh["action"] != run.action["kind"]
-    ):
-        raise HTTPException(409, "Current source data no longer permits this action")
+    # Rejection must remain available even if a source is down or a policy changed.
+    if decision == "approve":
+        policy = current_policy(db, run.tenant_id)
+        if approval.policy_id != policy.id or approval.action_hash != fingerprint(
+            run.action, policy.id
+        ):
+            raise HTTPException(409, "Policy or proposed action changed; submit a new request")
+        request = db.get(Request, run.request_id)
+        tenant = db.get(Tenant, run.tenant_id)
+        record = MockIntegration(db).retrieve(run.tenant_id, request.payload["record_id"])
+        fresh = decide(
+            tenant.workflow,
+            policy.rules,
+            RequestInput.model_validate(request.payload),
+            record,
+            run.recommendation.get("uncertain", True),
+        )
+        if decision == "approve" and (
+            fresh["outcome"] == "deny" or fresh["action"] != run.action["kind"]
+        ):
+            raise HTTPException(409, "Current source data no longer permits this action")
     from backend.db.models import now
 
     approval.status = "approved" if decision == "approve" else "rejected"

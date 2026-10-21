@@ -2,11 +2,12 @@
 
 import re
 from datetime import date
+
 from backend.schemas import RequestInput
 
 SECURITY = re.compile(
     r"admin|privileg|password|credential|reset|recover|mfa|2fa|token|secret|disable|bypass|ignore",
-    re.I,
+    re.IGNORECASE,
 )
 
 

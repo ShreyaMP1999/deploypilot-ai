@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+
 from backend.settings import settings
 
 engine = create_engine(

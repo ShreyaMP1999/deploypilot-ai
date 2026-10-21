@@ -1,5 +1,7 @@
 import json
+
 from openai import OpenAI
+
 from backend.schemas import Recommendation
 from backend.settings import settings
 
